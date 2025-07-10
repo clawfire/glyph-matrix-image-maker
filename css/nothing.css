@@ -1,0 +1,324 @@
+/* Fonts */
+
+@font-face {
+  font-family: Ndot-55;
+  src: url(../fonts/Ndot-55.otf);
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: NType82;
+  src: url(../fonts/NType82-Regular.otf);
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: NType82-bold;
+  src: url(../fonts/NType82-Headline.otf);
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: NType82Mono;
+  src: url(../fonts/NType82Mono-Regular.otf);
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: LetteraMonoLL Regular;
+  src: url(../fonts/LetteraMonoLL-Regular.otf);
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: LetteraMonoLLCondLight Regular;
+  src: url(../fonts/LetteraMonoLLCondLight-Regular.otf);
+  font-weight: normal;
+  font-style: normal;
+}
+
+.font-ntype82 {
+  font-family: NType82, sans-serif !important;
+}
+
+.font-ntype82-bold {
+  font-family: NType82-bold, sans-serif !important;
+}
+
+.font-bold {
+  font-family: "NType82-bold", "Noto Sans Thai", "NType82Mono" !important;
+}
+
+.font-ntype82-mono {
+  font-family: NType82Mono, monospace !important;
+}
+
+.font-lettera-mono {
+  font-family: LetteraMonoLL Regular, monospace !important;
+}
+
+.font-lettera-mono-cond-light {
+  font-family: LetteraMonoLLCondLight Regular, monospace !important;
+}
+
+.Ndot-55 {
+  font-family: Ndot-55, sans-serif !important;
+}
+
+:root {
+  --grey-darker: 180 1% 35%;
+}
+
+html,
+body {
+  background-color: black;
+  color: white;
+}
+
+header {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 30px);
+  max-width: 480px;
+  height: 80px;
+  text-align: center;
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  z-index: 999;
+  font-size: 0.8rem;
+}
+
+nav {
+  width: 100%;
+  height: 48px;
+  border-radius: 0.5rem;
+  background: hsl(var(--grey-darker) / 0.6);
+  backdrop-filter: blur(45px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: row;
+  user-select: none;
+}
+
+main {
+  position: absolute;
+  top: 68px;
+  left: 0;
+  width: 100vw;
+  margin: 0;
+  height: fit-content;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 1;
+}
+
+#controls,
+#privacy-overlay {
+  margin-top: 20px;
+  height: fit-content;
+  width: calc(100% - 50px);
+  padding: 5px;
+  max-width: 480px;
+  background: hsl(var(--grey-darker) / 0.6);
+  backdrop-filter: blur(45px);
+  border-radius: 0.5rem;
+}
+
+.controls-section {
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  margin-bottom: 15px;
+  gap: 10px;
+}
+
+.controls-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.controls-section-title {
+  text-align: left;
+  margin: 0;
+  padding: 5px;
+  font-family: NType82, sans-serif;
+  font-size: 1rem;
+  margin-bottom: 10px;
+}
+
+.controls-range {
+  width: 100%;
+  height: 20px;
+  border-radius: 10px;
+  outline: none;
+  accent-color: #ffffff;
+}
+
+#contrast-value {
+  text-align: center;
+  padding: 5px;
+  margin: 0;
+  font-family: NType82, sans-serif;
+  font-size: 1rem;
+}
+
+.controls-section button,
+#privacy-overlay button {
+  width: 100%;
+  height: 50px;
+  border-radius: 0.5rem;
+  background: hsl(var(--grey-darker) / 0.6);
+  backdrop-filter: blur(45px);
+  color: white;
+  font-family: NType82-bold, sans-serif;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.controls-section button.primary {
+  background: white;
+  color: #000;
+}
+
+#privacy-overlay {
+  background: white;
+  color: black;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 480px;
+  width: calc(100% - 50px);
+  height: fit-content;
+  font-family: NType82, sans-serif;
+  padding: 20px;
+}
+
+.rotate {
+  transform: rotate(180deg);
+}
+
+#glyph-matrix {
+  z-index: 0;
+  scale: 0.8;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#take-picture {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 15px 0 50px;
+}
+
+#privacy {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: hsl(var(--grey-darker) / 0.6);
+  border-radius: 50%;
+}
+
+#privacy:hover {
+  background-color: hsl(var(--grey-darker) / 0.8);
+  cursor: pointer;
+}
+
+.circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: white;
+  outline: 4px solid white;
+  outline-offset: 4px;
+}
+
+.circle:hover {
+  background-color: hsl(var(--grey-darker) / 0.6);
+  cursor: pointer;
+}
+
+#pixels {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  width: 85vw;
+  height: 100vh;
+  padding: 2.5vw;
+  z-index: -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2px, 1fr));
+  grid-auto-rows: 2px;
+  gap: 10vw;
+  overflow: hidden;
+}
+
+.pixel {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background-color: white;
+}
+
+.disclaimer {
+  font-family: NType82, sans-serif;
+  font-size: 0.5rem;
+  text-align: left;
+  bottom: 0px;
+  left: 10px;
+  position: absolute;
+  color: hsl(var(--grey-darker) / 0.8);
+  z-index: -1;
+}
+
+@media (max-width: 1400px) {
+  #pixels {
+    gap: 20vw;
+  }
+
+  .disclaimer {
+    position: relative;
+    z-index: 1;
+    text-wrap: wrap;
+    text-align: center;
+  }
+}
+
+#red-square {
+  background-color: hsl(350 85% 42%);
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  to {
+    background-color: transparent;
+  }
+}
