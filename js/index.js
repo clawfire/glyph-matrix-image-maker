@@ -210,6 +210,157 @@ async function getMonochromeArrayFromImageURL(url) {
 
 let matrix = new GlyphMatrix();
 
+// Crop functionality variables
+let cropImageData = null;
+let cropScale = 1;
+let cropOffsetX = 0;
+let cropOffsetY = 0;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+
+function showCropInterface(imageDataUrl) {
+  cropImageData = imageDataUrl;
+  const cropImage = document.getElementById('crop-image');
+  cropImage.src = imageDataUrl;
+  
+  // Reset crop settings
+  cropScale = 1;
+  cropOffsetX = 0;
+  cropOffsetY = 0;
+  document.getElementById('crop-zoom').value = 100;
+  document.getElementById('crop-zoom-value').textContent = '100%';
+  
+  // Show the crop overlay
+  document.getElementById('crop-overlay').classList.remove('hidden');
+  
+  // Update image transform
+  updateCropImageTransform();
+}
+
+function updateCropImageTransform() {
+  const cropImage = document.getElementById('crop-image');
+  cropImage.style.transform = `translate(calc(-50% + ${cropOffsetX}px), calc(-50% + ${cropOffsetY}px)) scale(${cropScale})`;
+}
+
+function handleCropZoom(event) {
+  const zoomValue = event.target.value;
+  cropScale = zoomValue / 100;
+  document.getElementById('crop-zoom-value').textContent = `${zoomValue}%`;
+  updateCropImageTransform();
+}
+
+function handleCropMouseDown(event) {
+  isDragging = true;
+  dragStartX = event.clientX - cropOffsetX;
+  dragStartY = event.clientY - cropOffsetY;
+  event.preventDefault();
+}
+
+function handleCropMouseMove(event) {
+  if (!isDragging) return;
+  
+  cropOffsetX = event.clientX - dragStartX;
+  cropOffsetY = event.clientY - dragStartY;
+  updateCropImageTransform();
+  event.preventDefault();
+}
+
+function handleCropMouseUp(event) {
+  isDragging = false;
+}
+
+function handleCropTouchStart(event) {
+  if (event.touches.length === 1) {
+    const touch = event.touches[0];
+    isDragging = true;
+    dragStartX = touch.clientX - cropOffsetX;
+    dragStartY = touch.clientY - cropOffsetY;
+    event.preventDefault();
+  }
+}
+
+function handleCropTouchMove(event) {
+  if (!isDragging || event.touches.length !== 1) return;
+  
+  const touch = event.touches[0];
+  cropOffsetX = touch.clientX - dragStartX;
+  cropOffsetY = touch.clientY - dragStartY;
+  updateCropImageTransform();
+  event.preventDefault();
+}
+
+function handleCropTouchEnd(event) {
+  isDragging = false;
+}
+
+function getCroppedImageData() {
+  return new Promise((resolve, reject) => {
+    const cropImage = document.getElementById('crop-image');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Create a new image element to ensure it's loaded
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = cropImageData;
+    
+    img.onload = () => {
+      // Calculate the crop area
+      const containerSize = 300; // Size of crop container
+      const circleSize = 280; // Size of crop circle
+      const scale = cropScale;
+      
+      // Calculate the source dimensions for cropping
+      const sourceSize = circleSize / scale;
+      const centerX = (containerSize / 2 - cropOffsetX) / scale;
+      const centerY = (containerSize / 2 - cropOffsetY) / scale;
+      
+      // Calculate source rectangle
+      const sourceX = centerX - sourceSize / 2;
+      const sourceY = centerY - sourceSize / 2;
+      
+      // Set canvas to square dimensions
+      canvas.width = 400;
+      canvas.height = 400;
+      
+      // Draw the cropped portion
+      ctx.drawImage(
+        img,
+        sourceX, sourceY, sourceSize, sourceSize,
+        0, 0, canvas.width, canvas.height
+      );
+      
+      resolve(canvas.toDataURL('image/png'));
+    };
+    
+    img.onerror = () => reject(new Error('Failed to load image for cropping'));
+  });
+}
+
+function handleCropConfirm() {
+  getCroppedImageData()
+    .then(croppedDataUrl => {
+      // Hide crop interface
+      document.getElementById('crop-overlay').classList.add('hidden');
+      
+      // Process the cropped image using existing pipeline
+      return getMonochromeArrayFromImageURL(croppedDataUrl);
+    })
+    .then(pixels => {
+      matrix.setPixelArray(pixels);
+    })
+    .catch(error => {
+      console.error('Error processing cropped image:', error);
+      // Hide crop interface on error
+      document.getElementById('crop-overlay').classList.add('hidden');
+    });
+}
+
+function handleCropCancel() {
+  document.getElementById('crop-overlay').classList.add('hidden');
+}
+
 function handleContrastChange(event) {
   const contrastValue = event.target.value;
   document.getElementById("contrast-value").textContent = `${contrastValue}%`;
@@ -223,13 +374,8 @@ function handleImageUpload(event) {
   if (file) {
     const reader = new FileReader();
     reader.onload = function (e) {
-      getMonochromeArrayFromImageURL(e.target.result)
-        .then((pixels) => {
-          matrix.setPixelArray(pixels);
-        })
-        .catch((error) => {
-          console.error("Error processing uploaded image:", error);
-        });
+      // Instead of directly processing, show crop interface first
+      showCropInterface(e.target.result);
     };
     reader.readAsDataURL(file);
   }
@@ -331,6 +477,28 @@ async function init() {
   privacyCloseButton.addEventListener("click", () => {
     document.getElementById("privacy-overlay").classList.add("hidden");
   });
+
+  // Crop interface event listeners
+  const cropZoomSlider = document.getElementById("crop-zoom");
+  cropZoomSlider.addEventListener("input", handleCropZoom);
+
+  const cropImageContainer = document.querySelector(".crop-image-container");
+  
+  // Mouse events for desktop
+  cropImageContainer.addEventListener("mousedown", handleCropMouseDown);
+  document.addEventListener("mousemove", handleCropMouseMove);
+  document.addEventListener("mouseup", handleCropMouseUp);
+
+  // Touch events for mobile
+  cropImageContainer.addEventListener("touchstart", handleCropTouchStart);
+  document.addEventListener("touchmove", handleCropTouchMove, { passive: false });
+  document.addEventListener("touchend", handleCropTouchEnd);
+
+  const cropConfirmButton = document.getElementById("crop-confirm");
+  cropConfirmButton.addEventListener("click", handleCropConfirm);
+
+  const cropCancelButton = document.getElementById("crop-cancel");
+  cropCancelButton.addEventListener("click", handleCropCancel);
 
   const toggleCameraMode = function (pictureTaken) {
     const redSquare = document.getElementById("red-square");
