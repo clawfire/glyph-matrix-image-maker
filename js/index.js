@@ -213,29 +213,58 @@ let matrix = new GlyphMatrix();
 // Crop functionality variables
 let cropImageData = null;
 let cropScale = 1;
+let cropBaseScale = 1; // The scale needed to fit image in container
 let cropOffsetX = 0;
 let cropOffsetY = 0;
 let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
+let originalImageWidth = 0;
+let originalImageHeight = 0;
 
 function showCropInterface(imageDataUrl) {
   cropImageData = imageDataUrl;
   const cropImage = document.getElementById('crop-image');
-  cropImage.src = imageDataUrl;
   
-  // Reset crop settings
-  cropScale = 1;
-  cropOffsetX = 0;
-  cropOffsetY = 0;
-  document.getElementById('crop-zoom').value = 100;
-  document.getElementById('crop-zoom-value').textContent = '100%';
+  // Load image to get dimensions and calculate proper fit
+  const tempImg = new Image();
+  tempImg.onload = function() {
+    originalImageWidth = tempImg.width;
+    originalImageHeight = tempImg.height;
+    
+    // Calculate the scale needed to fit the image in the container
+    const containerSize = 300;
+    const imageAspect = originalImageWidth / originalImageHeight;
+    
+    if (imageAspect > 1) {
+      // Wide image - fit to container width
+      cropBaseScale = containerSize / originalImageWidth;
+    } else {
+      // Tall or square image - fit to container height
+      cropBaseScale = containerSize / originalImageHeight;
+    }
+    
+    // Ensure the image covers at least the crop circle
+    const circleSize = 280;
+    const minScaleForCircle = circleSize / Math.min(originalImageWidth, originalImageHeight);
+    cropBaseScale = Math.max(cropBaseScale, minScaleForCircle);
+    
+    // Set initial crop settings - 100% zoom should show the image fitted
+    cropScale = cropBaseScale;
+    cropOffsetX = 0;
+    cropOffsetY = 0;
+    document.getElementById('crop-zoom').value = 100;
+    document.getElementById('crop-zoom-value').textContent = '100%';
+    
+    // Set the image source and show overlay
+    cropImage.src = imageDataUrl;
+    document.getElementById('crop-overlay').classList.remove('hidden');
+    
+    // Update image transform
+    updateCropImageTransform();
+  };
   
-  // Show the crop overlay
-  document.getElementById('crop-overlay').classList.remove('hidden');
-  
-  // Update image transform
-  updateCropImageTransform();
+  tempImg.src = imageDataUrl;
 }
 
 function updateCropImageTransform() {
@@ -245,7 +274,9 @@ function updateCropImageTransform() {
 
 function handleCropZoom(event) {
   const zoomValue = event.target.value;
-  cropScale = zoomValue / 100;
+  // Zoom relative to the base fitted scale
+  // 100% = fitted scale, 200% = 2x fitted scale, etc.
+  cropScale = cropBaseScale * (zoomValue / 100);
   document.getElementById('crop-zoom-value').textContent = `${zoomValue}%`;
   updateCropImageTransform();
 }
@@ -306,32 +337,92 @@ function getCroppedImageData() {
     img.src = cropImageData;
     
     img.onload = () => {
-      // Calculate the crop area
-      const containerSize = 300; // Size of crop container
-      const circleSize = 280; // Size of crop circle
-      const scale = cropScale;
-      
-      // Calculate the source dimensions for cropping
-      const sourceSize = circleSize / scale;
-      const centerX = (containerSize / 2 - cropOffsetX) / scale;
-      const centerY = (containerSize / 2 - cropOffsetY) / scale;
-      
-      // Calculate source rectangle
-      const sourceX = centerX - sourceSize / 2;
-      const sourceY = centerY - sourceSize / 2;
-      
-      // Set canvas to square dimensions
-      canvas.width = 400;
-      canvas.height = 400;
-      
-      // Draw the cropped portion
-      ctx.drawImage(
-        img,
-        sourceX, sourceY, sourceSize, sourceSize,
-        0, 0, canvas.width, canvas.height
-      );
-      
-      resolve(canvas.toDataURL('image/png'));
+      try {
+        // Calculate the crop area
+        const containerSize = 300; // Size of crop container
+        const circleSize = 280; // Size of crop circle
+        
+        // Calculate how the image is displayed
+        const displayScale = cropScale;
+        const displayWidth = originalImageWidth * displayScale;
+        const displayHeight = originalImageHeight * displayScale;
+        
+        // Calculate the center of the crop circle in image coordinates
+        const containerCenterX = containerSize / 2;
+        const containerCenterY = containerSize / 2;
+        
+        // Account for image offset
+        const imageCenterX = containerCenterX - cropOffsetX;
+        const imageCenterY = containerCenterY - cropOffsetY;
+        
+        // Convert to original image coordinates
+        const imageX = imageCenterX / displayScale;
+        const imageY = imageCenterY / displayScale;
+        
+        // Calculate crop size in original image coordinates
+        const cropSizeInImage = circleSize / displayScale;
+        
+        // Calculate source rectangle
+        let sourceX = imageX - cropSizeInImage / 2;
+        let sourceY = imageY - cropSizeInImage / 2;
+        let sourceWidth = cropSizeInImage;
+        let sourceHeight = cropSizeInImage;
+        
+        // Bounds checking - ensure we don't go outside the image
+        if (sourceX < 0) {
+          sourceWidth += sourceX;
+          sourceX = 0;
+        }
+        if (sourceY < 0) {
+          sourceHeight += sourceY;
+          sourceY = 0;
+        }
+        if (sourceX + sourceWidth > originalImageWidth) {
+          sourceWidth = originalImageWidth - sourceX;
+        }
+        if (sourceY + sourceHeight > originalImageHeight) {
+          sourceHeight = originalImageHeight - sourceY;
+        }
+        
+        // Ensure we have valid dimensions
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+          throw new Error('Invalid crop area - outside image bounds');
+        }
+        
+        // Set canvas to square dimensions
+        const outputSize = 400;
+        canvas.width = outputSize;
+        canvas.height = outputSize;
+        
+        // Calculate destination rectangle to maintain aspect ratio
+        const cropAspect = sourceWidth / sourceHeight;
+        let destX = 0, destY = 0, destWidth = outputSize, destHeight = outputSize;
+        
+        if (cropAspect > 1) {
+          // Wide crop - letterbox vertically
+          destHeight = outputSize / cropAspect;
+          destY = (outputSize - destHeight) / 2;
+        } else if (cropAspect < 1) {
+          // Tall crop - letterbox horizontally
+          destWidth = outputSize * cropAspect;
+          destX = (outputSize - destWidth) / 2;
+        }
+        
+        // Fill canvas with black background
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, outputSize, outputSize);
+        
+        // Draw the cropped portion
+        ctx.drawImage(
+          img,
+          sourceX, sourceY, sourceWidth, sourceHeight,
+          destX, destY, destWidth, destHeight
+        );
+        
+        resolve(canvas.toDataURL('image/png'));
+      } catch (error) {
+        reject(new Error('Failed to crop image: ' + error.message));
+      }
     };
     
     img.onerror = () => reject(new Error('Failed to load image for cropping'));
