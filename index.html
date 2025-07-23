@@ -464,6 +464,32 @@
           <button id="privacy-close">Close</button>
         </div>
       </div>
+      <div id="crop-overlay" class="hidden">
+        <div class="crop-content">
+          <h2 class="Ndot-55">Crop Your Image</h2>
+          <p>Select the square area you want to use for the glyph matrix</p>
+          <div class="crop-container">
+            <div class="crop-image-container">
+              <img id="crop-image" src="" alt="Image to crop" />
+              <div class="crop-circle-overlay"></div>
+            </div>
+            <div class="crop-controls">
+              <div class="crop-control-group">
+                <label for="crop-zoom">Zoom:</label>
+                <input type="range" id="crop-zoom" min="100" max="300" value="100" step="10" />
+                <span id="crop-zoom-value">100%</span>
+              </div>
+              <div class="crop-control-group">
+                <label>Pan: Use mouse/touch to drag the image</label>
+              </div>
+            </div>
+          </div>
+          <div class="crop-buttons">
+            <button id="crop-cancel">Cancel</button>
+            <button id="crop-confirm" class="primary">Use This Crop</button>
+          </div>
+        </div>
+      </div>
       <p class="disclaimer">
         This app is an unofficial app, Nothing Technology Limited is not
         responsible for this app or any of its features.<br />This app is not

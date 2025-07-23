@@ -210,6 +210,248 @@ async function getMonochromeArrayFromImageURL(url) {
 
 let matrix = new GlyphMatrix();
 
+// Crop functionality variables
+let cropImageData = null;
+let cropScale = 1;
+let cropBaseScale = 1; // The scale needed to fit image in container
+let cropOffsetX = 0;
+let cropOffsetY = 0;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let originalImageWidth = 0;
+let originalImageHeight = 0;
+
+function showCropInterface(imageDataUrl) {
+  cropImageData = imageDataUrl;
+  const cropImage = document.getElementById('crop-image');
+  
+  // Load image to get dimensions and calculate proper fit
+  const tempImg = new Image();
+  tempImg.onload = function() {
+    originalImageWidth = tempImg.width;
+    originalImageHeight = tempImg.height;
+    
+    // Calculate the scale needed to fit the image in the container
+    const containerSize = 300;
+    const imageAspect = originalImageWidth / originalImageHeight;
+    
+    if (imageAspect > 1) {
+      // Wide image - fit to container width
+      cropBaseScale = containerSize / originalImageWidth;
+    } else {
+      // Tall or square image - fit to container height
+      cropBaseScale = containerSize / originalImageHeight;
+    }
+    
+    // Ensure the image covers at least the crop circle
+    const circleSize = 280;
+    const minScaleForCircle = circleSize / Math.min(originalImageWidth, originalImageHeight);
+    cropBaseScale = Math.max(cropBaseScale, minScaleForCircle);
+    
+    // Set initial crop settings - 100% zoom should show the image fitted
+    cropScale = cropBaseScale;
+    cropOffsetX = 0;
+    cropOffsetY = 0;
+    document.getElementById('crop-zoom').value = 100;
+    document.getElementById('crop-zoom-value').textContent = '100%';
+    
+    // Set the image source and show overlay
+    cropImage.src = imageDataUrl;
+    document.getElementById('crop-overlay').classList.remove('hidden');
+    
+    // Update image transform
+    updateCropImageTransform();
+  };
+  
+  tempImg.src = imageDataUrl;
+}
+
+function updateCropImageTransform() {
+  const cropImage = document.getElementById('crop-image');
+  cropImage.style.transform = `translate(calc(-50% + ${cropOffsetX}px), calc(-50% + ${cropOffsetY}px)) scale(${cropScale})`;
+}
+
+function handleCropZoom(event) {
+  const zoomValue = event.target.value;
+  // Zoom relative to the base fitted scale
+  // 100% = fitted scale, 200% = 2x fitted scale, etc.
+  cropScale = cropBaseScale * (zoomValue / 100);
+  document.getElementById('crop-zoom-value').textContent = `${zoomValue}%`;
+  updateCropImageTransform();
+}
+
+function handleCropMouseDown(event) {
+  isDragging = true;
+  dragStartX = event.clientX - cropOffsetX;
+  dragStartY = event.clientY - cropOffsetY;
+  event.preventDefault();
+}
+
+function handleCropMouseMove(event) {
+  if (!isDragging) return;
+  
+  cropOffsetX = event.clientX - dragStartX;
+  cropOffsetY = event.clientY - dragStartY;
+  updateCropImageTransform();
+  event.preventDefault();
+}
+
+function handleCropMouseUp(event) {
+  isDragging = false;
+}
+
+function handleCropTouchStart(event) {
+  if (event.touches.length === 1) {
+    const touch = event.touches[0];
+    isDragging = true;
+    dragStartX = touch.clientX - cropOffsetX;
+    dragStartY = touch.clientY - cropOffsetY;
+    event.preventDefault();
+  }
+}
+
+function handleCropTouchMove(event) {
+  if (!isDragging || event.touches.length !== 1) return;
+  
+  const touch = event.touches[0];
+  cropOffsetX = touch.clientX - dragStartX;
+  cropOffsetY = touch.clientY - dragStartY;
+  updateCropImageTransform();
+  event.preventDefault();
+}
+
+function handleCropTouchEnd(event) {
+  isDragging = false;
+}
+
+function getCroppedImageData() {
+  return new Promise((resolve, reject) => {
+    const cropImage = document.getElementById('crop-image');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Create a new image element to ensure it's loaded
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = cropImageData;
+    
+    img.onload = () => {
+      try {
+        // Calculate the crop area
+        const containerSize = 300; // Size of crop container
+        const circleSize = 280; // Size of crop circle
+        
+        // Calculate how the image is displayed
+        const displayScale = cropScale;
+        const displayWidth = originalImageWidth * displayScale;
+        const displayHeight = originalImageHeight * displayScale;
+        
+        // Calculate the center of the crop circle in image coordinates
+        const containerCenterX = containerSize / 2;
+        const containerCenterY = containerSize / 2;
+        
+        // Account for image offset
+        const imageCenterX = containerCenterX - cropOffsetX;
+        const imageCenterY = containerCenterY - cropOffsetY;
+        
+        // Convert to original image coordinates
+        const imageX = imageCenterX / displayScale;
+        const imageY = imageCenterY / displayScale;
+        
+        // Calculate crop size in original image coordinates
+        const cropSizeInImage = circleSize / displayScale;
+        
+        // Calculate source rectangle
+        let sourceX = imageX - cropSizeInImage / 2;
+        let sourceY = imageY - cropSizeInImage / 2;
+        let sourceWidth = cropSizeInImage;
+        let sourceHeight = cropSizeInImage;
+        
+        // Bounds checking - ensure we don't go outside the image
+        if (sourceX < 0) {
+          sourceWidth += sourceX;
+          sourceX = 0;
+        }
+        if (sourceY < 0) {
+          sourceHeight += sourceY;
+          sourceY = 0;
+        }
+        if (sourceX + sourceWidth > originalImageWidth) {
+          sourceWidth = originalImageWidth - sourceX;
+        }
+        if (sourceY + sourceHeight > originalImageHeight) {
+          sourceHeight = originalImageHeight - sourceY;
+        }
+        
+        // Ensure we have valid dimensions
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+          throw new Error('Invalid crop area - outside image bounds');
+        }
+        
+        // Set canvas to square dimensions
+        const outputSize = 400;
+        canvas.width = outputSize;
+        canvas.height = outputSize;
+        
+        // Calculate destination rectangle to maintain aspect ratio
+        const cropAspect = sourceWidth / sourceHeight;
+        let destX = 0, destY = 0, destWidth = outputSize, destHeight = outputSize;
+        
+        if (cropAspect > 1) {
+          // Wide crop - letterbox vertically
+          destHeight = outputSize / cropAspect;
+          destY = (outputSize - destHeight) / 2;
+        } else if (cropAspect < 1) {
+          // Tall crop - letterbox horizontally
+          destWidth = outputSize * cropAspect;
+          destX = (outputSize - destWidth) / 2;
+        }
+        
+        // Fill canvas with black background
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, outputSize, outputSize);
+        
+        // Draw the cropped portion
+        ctx.drawImage(
+          img,
+          sourceX, sourceY, sourceWidth, sourceHeight,
+          destX, destY, destWidth, destHeight
+        );
+        
+        resolve(canvas.toDataURL('image/png'));
+      } catch (error) {
+        reject(new Error('Failed to crop image: ' + error.message));
+      }
+    };
+    
+    img.onerror = () => reject(new Error('Failed to load image for cropping'));
+  });
+}
+
+function handleCropConfirm() {
+  getCroppedImageData()
+    .then(croppedDataUrl => {
+      // Hide crop interface
+      document.getElementById('crop-overlay').classList.add('hidden');
+      
+      // Process the cropped image using existing pipeline
+      return getMonochromeArrayFromImageURL(croppedDataUrl);
+    })
+    .then(pixels => {
+      matrix.setPixelArray(pixels);
+    })
+    .catch(error => {
+      console.error('Error processing cropped image:', error);
+      // Hide crop interface on error
+      document.getElementById('crop-overlay').classList.add('hidden');
+    });
+}
+
+function handleCropCancel() {
+  document.getElementById('crop-overlay').classList.add('hidden');
+}
+
 function handleContrastChange(event) {
   const contrastValue = event.target.value;
   document.getElementById("contrast-value").textContent = `${contrastValue}%`;
@@ -223,13 +465,8 @@ function handleImageUpload(event) {
   if (file) {
     const reader = new FileReader();
     reader.onload = function (e) {
-      getMonochromeArrayFromImageURL(e.target.result)
-        .then((pixels) => {
-          matrix.setPixelArray(pixels);
-        })
-        .catch((error) => {
-          console.error("Error processing uploaded image:", error);
-        });
+      // Instead of directly processing, show crop interface first
+      showCropInterface(e.target.result);
     };
     reader.readAsDataURL(file);
   }
@@ -331,6 +568,28 @@ async function init() {
   privacyCloseButton.addEventListener("click", () => {
     document.getElementById("privacy-overlay").classList.add("hidden");
   });
+
+  // Crop interface event listeners
+  const cropZoomSlider = document.getElementById("crop-zoom");
+  cropZoomSlider.addEventListener("input", handleCropZoom);
+
+  const cropImageContainer = document.querySelector(".crop-image-container");
+  
+  // Mouse events for desktop
+  cropImageContainer.addEventListener("mousedown", handleCropMouseDown);
+  document.addEventListener("mousemove", handleCropMouseMove);
+  document.addEventListener("mouseup", handleCropMouseUp);
+
+  // Touch events for mobile
+  cropImageContainer.addEventListener("touchstart", handleCropTouchStart);
+  document.addEventListener("touchmove", handleCropTouchMove, { passive: false });
+  document.addEventListener("touchend", handleCropTouchEnd);
+
+  const cropConfirmButton = document.getElementById("crop-confirm");
+  cropConfirmButton.addEventListener("click", handleCropConfirm);
+
+  const cropCancelButton = document.getElementById("crop-cancel");
+  cropCancelButton.addEventListener("click", handleCropCancel);
 
   const toggleCameraMode = function (pictureTaken) {
     const redSquare = document.getElementById("red-square");
